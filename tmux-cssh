@@ -10,6 +10,7 @@ SSH_COMMAND="ssh"
 SSH_ARGS=""
 SYNCHRONIZE_PANES="true"
 TMUX_LAYOUT="tiled"
+DISPLAY_FAILURES="0"
 
 # Config-file in home directory
 CONFIG_FILENAME=".tmux-cssh"
@@ -18,7 +19,7 @@ CONFIG_SETTING_NAME=""
 
 # Outputs script syntax and help
 syntax() {
-	echo "Syntax: ${THIS_BASENAME} [-h|-u [user]|-c|--certificate|-i|--identity [path to certificate-/identity-file]|-sc [ssh-server-connect-string]|-sa [additional ssh arguments]|-ss,-csc [ssh-command]|-ts [session-name]|-ns|-tl [tmux-layout]|-set|-q|-f [filename]|-cs [name of config-parameters to use]|[-dc,-ds][-cf config-file]]"
+	echo "Syntax: ${THIS_BASENAME} [-h|-u [user]|-c|--certificate|-i|--identity [path to certificate-/identity-file]|-sc [ssh-server-connect-string]|-sa [additional ssh arguments]|-ss,-csc [ssh-command]|-ts [session-name]|-ns|-tl [tmux-layout]|-set|-q|-f [filename]|-cs [name of config-parameters to use]|[-dc,-ds][-cf config-file][-df seconds-to-display-error]]"
 	echo
 
 	echo "-h | --help                                This help."
@@ -67,6 +68,9 @@ syntax() {
 	echo
 
 	echo "-cf | --config-file                        Config-file to use, (Default ${USE_CONFIG_FILENAME}), Designed for option to switch between multiples config-files via one tmux-cssh call."
+	echo
+
+	echo "-df | --display-failures                   Number of seconds during which displaying failures when SSH connection did not succeed, if specified default: 5 seconds."
 	echo
 
 	echo "* Other arguments will be interpreted as '-sc'."
@@ -120,6 +124,7 @@ analyseParameters() {
 				shift;;
 			-dc|--dont-clusterize|-ds|--dont-synchronize) SYNCHRONIZE_PANES="false";;
 			-cf|--config-file) USE_CONFIG_FILENAME="$2"; shift;;
+			-df|--display-failures) DISPLAY_FAILURES="$2"; shift;;
 			*)
 				if [ "$1" != "" ]; then
 					if [ -z "$HOSTS" ]; then
@@ -284,11 +289,16 @@ for host in ${HOSTS}; do
 		connectString="${SSH_ARGS} ${connectString}"
 	fi
 
-	# Finalize connect-string
+	# Add SSH invocation
 	connectString="${SSH_COMMAND} ${connectString}"
 
 	# Output
 	output "* Connecting '${connectString}'"
+
+	# Finalize connect-string to display potential SSH connection failure
+	if [ "${DISPLAY_FAILURES}" != "0" ] && [ "${DISPLAY_FAILURES}" -eq "${DISPLAY_FAILURES}" ] 2>/dev/null; then
+		connectString="${connectString} || sleep ${DISPLAY_FAILURES}"
+	fi
 
 	# First Call, inits the tmux-session
 	if [ "${initTmuxCall}" = "true" ]; then
